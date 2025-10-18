@@ -3,6 +3,20 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        getByName("debug") {
+            keyAlias = "key0"
+            storeFile = file("D:\\A-development-project\\AndroidProject\\Qianming\\Test01Shudu.jks")
+            storePassword = "200662.Gd"
+            keyPassword = "200662.Gd"
+        }
+        create("release") {
+            storeFile = file("D:\\A-development-project\\AndroidProject\\Qianming\\Test01Shudu.jks")
+            storePassword = "200662.Gd"
+            keyAlias = "key0"
+            keyPassword = "200662.Gd"
+        }
+    }
     namespace = "com.example.myapplication_test01"
     compileSdk = 36
 
@@ -23,6 +37,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
