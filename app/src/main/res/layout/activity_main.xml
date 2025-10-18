@@ -36,6 +36,16 @@
         android:textSize="16sp"
         android:textAlignment="center"
         android:padding="4dp"/>
+        
+    <!-- 能量点显示 -->
+    <TextView
+        android:id="@+id/energy"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="能量点：5"
+        android:textSize="16sp"
+        android:textAlignment="center"
+        android:padding="4dp"/>
 
     <!-- 数独网格容器 -->
     <HorizontalScrollView
@@ -228,7 +238,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="检查答案"
+            android:text="提示"
             android:padding="12dp"
             android:layout_marginLeft="4dp"/>
     </LinearLayout>

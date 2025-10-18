@@ -15,11 +15,17 @@ public class MainActivity extends AppCompatActivity {
 
     // MainActivity.java (添加成员变量)
     private int score = 0; // 游戏得分
+    private int energy = 5; // 能量点数，初始为5
+    private int initialEnergy = 5; // 保存初始能量值，用于新游戏
+    private int lastCompletedEnergy = 5; // 保存上一局完成时的能量值，用于重置
+    private int filledCells = 0; // 已填入的单元格数量
     private TextView scoreTextView; // 得分显示控件
+    private TextView energyTextView; // 能量点显示控件
 
     // 数独游戏数据
     private int[][] sudokuGrid = new int[9][9];
-    private int[][] originalGrid = new int[9][9];
+    private int[][] originalGrid = new int[9][9];  // 存储完整解答
+    private int[][] puzzleGrid = new int[9][9];    // 存储初始题目
     private Button[][] cellButtons = new Button[9][9];
     private int selectedRow = -1;
     private int selectedCol = -1;
@@ -43,12 +49,27 @@ public class MainActivity extends AppCompatActivity {
 
         // 初始化得分显示控件
         scoreTextView = findViewById(R.id.score);
-
+        
+        // 初始化能量点显示控件
+        energyTextView = findViewById(R.id.energy);
+        
+        // 初始化数独网格
         initializeSudokuGrid();
+        // 生成数独谜题
         generateRandomSudoku(difficulty);
+        // 创建UI网格
         createGridUI();
+        // 设置数字按钮点击事件
         setupNumberButtons();
+        // 设置控制按钮点击事件
         setupControlButtons();
+        
+        // 初始化能量点和已填入单元格计数
+        energy = 5; // 初始能量值
+        initialEnergy = 5; // 保存初始能量值
+        lastCompletedEnergy = 5; // 初始完成时能量值
+        filledCells = 0;
+        updateEnergyDisplay();
 
 
     }
@@ -117,8 +138,8 @@ public class MainActivity extends AppCompatActivity {
         // 重置按钮
         findViewById(R.id.btnReset).setOnClickListener(v -> resetGame());
 
-        // 检查答案按钮
-        findViewById(R.id.btnCheck).setOnClickListener(v -> checkSolution());
+        // 提示按钮
+        findViewById(R.id.btnCheck).setOnClickListener(v -> showHint());
     }
 
     // 显示难度选择对话框
@@ -141,9 +162,13 @@ public class MainActivity extends AppCompatActivity {
                 TextView statusTextView = findViewById(R.id.status);
                 statusTextView.setText("难度：" + difficulties[difficulty]);
 
-                //新游戏重置得分
+                //新游戏重置得分和能量值
                 score = 0;
+                energy = 5; // 重置能量值为初始值
+                initialEnergy = 5; // 保存初始能量值
+                filledCells = 0; // 重置已填入单元格计数
                 updateScoreDisplay();
+                updateEnergyDisplay();
 
                 // 生成新的数独谜题
                 generateRandomSudoku(difficulty);
@@ -171,6 +196,11 @@ public class MainActivity extends AppCompatActivity {
         // 生成完整的数独解
         fillGrid(0, 0);
 
+        // 保存完整解作为提示答案
+        for (int i = 0; i < 9; i++) {
+            System.arraycopy(sudokuGrid[i], 0, originalGrid[i], 0, 9);
+        }
+
         // 根据难度移除不同数量的数字
         int cellsToRemove;
         switch (difficulty) {
@@ -189,9 +219,9 @@ public class MainActivity extends AppCompatActivity {
 
         removeCells(cellsToRemove);
 
-        // 保存原始网格用于重置
+        // 保存初始题目用于重置
         for (int i = 0; i < 9; i++) {
-            System.arraycopy(sudokuGrid[i], 0, originalGrid[i], 0, 9);
+            System.arraycopy(sudokuGrid[i], 0, puzzleGrid[i], 0, 9);
         }
     }
 
@@ -259,14 +289,14 @@ public class MainActivity extends AppCompatActivity {
             if (sudokuGrid[selectedRow][selectedCol] != 0 && originalGrid[selectedRow][selectedCol] == 0) {
                 cellButtons[selectedRow][selectedCol].setBackgroundResource(R.drawable.cell_fixed);
                 cellButtons[selectedRow][selectedCol].setTextColor(getResources().getColor(android.R.color.white));
-            } else if (originalGrid[selectedRow][selectedCol] == 0) {
+            } else if (puzzleGrid[selectedRow][selectedCol] == 0) {
                 // 空白单元格恢复默认样式
                 cellButtons[selectedRow][selectedCol].setBackgroundResource(R.drawable.cell_default);
             }
         }
 
         // 设置新选中的单元格样式（只对可编辑单元格生效）
-        if (originalGrid[row][col] == 0) {
+        if (puzzleGrid[row][col] == 0) {
             selectedRow = row;
             selectedCol = col;
             cellButtons[row][col].setBackgroundResource(R.drawable.cell_selected);
@@ -312,11 +342,32 @@ public class MainActivity extends AppCompatActivity {
                 selectedRow = -1;
                 selectedCol = -1;
 
+                // 增加已填入单元格计数
+                filledCells++;
+                // 每填入5个单元格增加1点能量
+                if (filledCells % 5 == 0) {
+                    energy++;
+                    updateEnergyDisplay();
+                }
+                
                 // 检查游戏是否完成
                 if (isGameComplete()) {
                     score += 5;
+                    // 保存完成时的能量值，用于重置
+                    lastCompletedEnergy = energy;
                     updateScoreDisplay();
-                    Toast.makeText(this, "恭喜你完成了数独！获得5分", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "恭喜你完成了数独！获得5分，即将开始下一局", Toast.LENGTH_LONG).show();
+                    
+                    // 延迟一段时间后自动开始下一局游戏
+                    findViewById(R.id.btnNewGame).postDelayed(() -> {
+                        generateRandomSudoku(difficulty);
+                        createGridUI();
+                        selectedRow = -1;
+                        selectedCol = -1;
+                        // 重置已填入单元格计数
+                        filledCells = 0;
+                        Toast.makeText(this, "新局游戏开始", Toast.LENGTH_SHORT).show();
+                    }, 2000);
                 }
             } else {
                 Toast.makeText(this, "这个数字在这里无效", Toast.LENGTH_SHORT).show();
@@ -328,6 +379,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateScoreDisplay() {
         scoreTextView.setText("得分：" + score);
+    }
+    
+    // 更新能量点显示
+    private void updateEnergyDisplay() {
+        if (energyTextView != null) {
+            energyTextView.setText("能量点：" + energy);
+        }
     }
 
     // 清除数字
@@ -343,9 +401,9 @@ public class MainActivity extends AppCompatActivity {
 
     // 重置游戏
     private void resetGame() {
-        // 恢复原始网格
+        // 恢复初始题目
         for (int i = 0; i < 9; i++) {
-            System.arraycopy(originalGrid[i], 0, sudokuGrid[i], 0, 9);
+            System.arraycopy(puzzleGrid[i], 0, sudokuGrid[i], 0, 9);
         }
 
         // 更新UI
@@ -362,17 +420,117 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // 恢复能量值到上一局完成时的状态
+        energy = lastCompletedEnergy;
+        filledCells = 0; // 重置已填入单元格计数
+        updateEnergyDisplay();
+
         selectedRow = -1;
         selectedCol = -1;
         Toast.makeText(this, "游戏已重置", Toast.LENGTH_SHORT).show();
     }
 
-    // 检查答案
-    private void checkSolution() {
-        if (isGameComplete()) {
-            Toast.makeText(this, "恭喜你，答案正确！", Toast.LENGTH_LONG).show();
+    // 提供提示
+    private void showHint() {
+        // 检查是否有足够的能量点
+        if (energy <= 0) {
+            Toast.makeText(this, "能量点不足，无法使用提示功能", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // 如果用户已经选择了一个单元格
+        if (selectedRow != -1 && selectedCol != -1) {
+            // 如果该单元格是空白的
+            if (sudokuGrid[selectedRow][selectedCol] == 0) {
+                // 获取正确答案
+                int correctNumber = originalGrid[selectedRow][selectedCol];
+                if (correctNumber != 0) {
+                    // 消耗1点能量
+                    energy--;
+                    updateEnergyDisplay();
+                    
+                    // 填入正确答案
+                    sudokuGrid[selectedRow][selectedCol] = correctNumber;
+                    cellButtons[selectedRow][selectedCol].setText(String.valueOf(correctNumber));
+                    cellButtons[selectedRow][selectedCol].setTextColor(getResources().getColor(android.R.color.white));
+                    cellButtons[selectedRow][selectedCol].setBackgroundResource(R.drawable.cell_fixed);
+                    
+                    // 清除选中状态，与手动输入数字后行为一致
+                    selectedRow = -1;
+                    selectedCol = -1;
+                    
+                    Toast.makeText(this, "已填入提示数字", Toast.LENGTH_SHORT).show();
+                    
+                    // 检查游戏是否完成
+                    if (isGameComplete()) {
+                        score += 5;
+                        lastCompletedEnergy = energy; // 保存完成时的能量值
+                        updateScoreDisplay();
+                        Toast.makeText(this, "恭喜你完成了数独！获得5分，即将开始下一局", Toast.LENGTH_LONG).show();
+                        
+                        // 延迟一段时间后自动开始下一局游戏
+                        findViewById(R.id.btnNewGame).postDelayed(() -> {
+                            generateRandomSudoku(difficulty);
+                            createGridUI();
+                            selectedRow = -1;
+                            selectedCol = -1;
+                            // 重置已填入单元格计数
+                            filledCells = 0;
+                            Toast.makeText(this, "新局游戏开始", Toast.LENGTH_SHORT).show();
+                        }, 2000);
+                    }
+                }
+            } else {
+                Toast.makeText(this, "该单元格已经有数字了", Toast.LENGTH_SHORT).show();
+            }
         } else {
-            Toast.makeText(this, "还有错误或未完成的单元格", Toast.LENGTH_LONG).show();
+            // 随机选择一个空白单元格并给出提示
+            boolean found = false;
+            for (int i = 0; i < 9 && !found; i++) {
+                for (int j = 0; j < 9 && !found; j++) {
+                    if (sudokuGrid[i][j] == 0) {
+                        // 获取正确答案
+                        int correctNumber = originalGrid[i][j];
+                        if (correctNumber != 0) {
+                            // 消耗1点能量
+                            energy--;
+                            updateEnergyDisplay();
+                            
+                            // 填入正确答案
+                            sudokuGrid[i][j] = correctNumber;
+                            cellButtons[i][j].setText(String.valueOf(correctNumber));
+                            cellButtons[i][j].setTextColor(getResources().getColor(android.R.color.white));
+                            cellButtons[i][j].setBackgroundResource(R.drawable.cell_fixed);
+                            
+                            Toast.makeText(this, "提示：在第" + (i+1) + "行第" + (j+1) + "列填入" + correctNumber, Toast.LENGTH_LONG).show();
+                            found = true;
+                            
+                            // 检查游戏是否完成
+                            if (isGameComplete()) {
+                                score += 5;
+                                lastCompletedEnergy = energy; // 保存完成时的能量值
+                                updateScoreDisplay();
+                                Toast.makeText(this, "恭喜你完成了数独！获得5分，即将开始下一局", Toast.LENGTH_LONG).show();
+                                
+                                // 延迟一段时间后自动开始下一局游戏
+                                findViewById(R.id.btnNewGame).postDelayed(() -> {
+                                    generateRandomSudoku(difficulty);
+                                    createGridUI();
+                                    selectedRow = -1;
+                                    selectedCol = -1;
+                                    // 重置已填入单元格计数
+                                    filledCells = 0;
+                                    Toast.makeText(this, "新局游戏开始", Toast.LENGTH_SHORT).show();
+                                }, 2000);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (!found) {
+                Toast.makeText(this, "没有可提示的单元格", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
