@@ -38,14 +38,30 @@
         android:padding="4dp"/>
         
     <!-- 能量点显示 -->
-    <TextView
-        android:id="@+id/energy"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="能量点：5"
-        android:textSize="16sp"
-        android:textAlignment="center"
-        android:padding="4dp"/>
+        android:orientation="horizontal"
+        android:gravity="center">
+        
+        <TextView
+            android:id="@+id/energy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="能量点：5"
+            android:textSize="16sp"
+            android:textAlignment="center"
+            android:padding="4dp"/>
+            
+        <Button
+            android:id="@+id/btnPay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="充值"
+            android:layout_marginStart="16dp"
+            android:textSize="14sp"/>
+            
+    </LinearLayout>
 
     <!-- 数独网格容器 -->
     <HorizontalScrollView

@@ -3,6 +3,8 @@ package com.example.myapplication_test01;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.view.View;
 import android.widget.Button;
 import android.widget.GridLayout;
@@ -10,6 +12,16 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import java.util.Random;
+
+// 添加支付宝支付相关导入
+import android.content.pm.PackageManager;
+import android.text.TextUtils;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import android.Manifest;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -30,6 +42,49 @@ public class MainActivity extends AppCompatActivity {
     private int selectedRow = -1;
     private int selectedCol = -1;
     private int difficulty = 0; // 0:简单, 1:中等, 2:困难
+
+    // 支付宝支付相关常量
+    private static final int SDK_PAY_FLAG = 1;
+    
+    // 支付宝支付Handler
+    private Handler mHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case SDK_PAY_FLAG: {
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> result = (Map<String, String>) msg.obj;
+                    AlipayUtil.handlePayResult(MainActivity.this, result, new AlipayUtil.OnPayResultListener() {
+                        @Override
+                        public void onSuccess(Map<String, String> result) {
+                            // 从按钮Tag中获取应该增加的能量点数
+                            int energyToAdd = 5; // 默认值
+                            Object tag = findViewById(R.id.btnPay).getTag();
+                            if (tag instanceof Integer) {
+                                energyToAdd = (Integer) tag;
+                            }
+                            
+                            energy += energyToAdd;
+                            updateEnergyDisplay();
+                            Toast.makeText(MainActivity.this, "支付成功，获得" + energyToAdd + "点能量！", Toast.LENGTH_LONG).show();
+                        }
+
+                        @Override
+                        public void onConfirming(Map<String, String> result) {
+                            Toast.makeText(MainActivity.this, "支付结果确认中...", Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onFail(Map<String, String> result) {
+                            Toast.makeText(MainActivity.this, "支付失败", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                    break;
+                }
+                default:
+                    break;
+            }
+        };
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,7 +126,8 @@ public class MainActivity extends AppCompatActivity {
         filledCells = 0;
         updateEnergyDisplay();
 
-
+        // 设置支付按钮点击事件
+        setupPayButton();
     }
 
     // 初始化数独网格UI
@@ -140,6 +196,162 @@ public class MainActivity extends AppCompatActivity {
 
         // 提示按钮
         findViewById(R.id.btnCheck).setOnClickListener(v -> showHint());
+    }
+
+    // 设置支付按钮点击事件
+    private void setupPayButton() {
+        Button payButton = findViewById(R.id.btnPay);
+        if (payButton != null) {
+            payButton.setOnClickListener(v -> showPayOptionsDialog());
+        } else {
+            Toast.makeText(this, "支付按钮未找到", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // 显示支付选项对话框
+    private void showPayOptionsDialog() {
+        final String[] options = {"2元充值1能量点", "3元充值2能量点", "5元充值4能量点"};
+        
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("充值能量点")
+               .setItems(options, new DialogInterface.OnClickListener() {
+                   public void onClick(DialogInterface dialog, int which) {
+                       switch (which) {
+                           case 0:
+                               // 支付2元获得1点能量
+                               payWithAlipay("2.00", "能量点充值", "充值1点能量", 1);
+                               break;
+                           case 1:
+                               // 支付3元获得2点能量
+                               payWithAlipay("3.00", "能量点充值", "充值2点能量", 2);
+                               break;
+                           case 2:
+                               // 支付5元获得4点能量
+                               payWithAlipay("5.00", "能量点充值", "充值4点能量", 4);
+                               break;
+                       }
+                   }
+               })
+               .setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                   public void onClick(DialogInterface dialog, int id) {
+                       // 用户取消了对话框
+                   }
+               });
+        builder.create().show();
+    }
+
+    // 调用支付宝支付
+    private void payWithAlipay(String money, String subject, String body, int energyPoints) {
+        // 检查是否安装了支付宝
+        if (!checkAliPayInstalled()) {
+            Toast.makeText(this, "请先安装支付宝客户端", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 构造订单信息（实际项目中应该从服务器获取）
+        String orderInfo = getOrderInfo(subject, body, money);
+        
+        // 将能量点数存储在Tag中，以便支付完成后使用
+        findViewById(R.id.btnPay).setTag(energyPoints);
+
+        // 调用支付宝支付
+        AlipayUtil.pay(this, orderInfo, mHandler);
+    }
+
+    /**
+     * 构造支付订单信息（示例）
+     * 实际项目中应该从服务器获取签名后的订单信息
+     * 
+     * @param subject 商品名称
+     * @param body 商品描述
+     * @param money 金额
+     * @return 订单信息
+     */
+    private String getOrderInfo(String subject, String body, String money) {
+        // 签约合作者身份ID（沙箱环境）
+        String orderInfo = "partner=\"2088721084755160\"";
+
+        // 签约卖家支付宝账号（沙箱环境）
+        orderInfo += "&seller_id=\"feouyv6674@sandbox.com\"";
+
+        // 商户网站唯一订单号（实际项目中应该是唯一的）
+        orderInfo += "&out_trade_no=\"sudoku_energy_" + System.currentTimeMillis() + "\"";
+
+        // 商品名称
+        orderInfo += "&subject=\"" + subject + "\"";
+
+        // 商品详情
+        orderInfo += "&body=\"" + body + "\"";
+
+        // 商品金额
+        orderInfo += "&total_fee=\"" + money + "\"";
+
+        // 服务器异步通知页面路径（沙箱测试环境）
+        orderInfo += "&notify_url=\"http://notify.msp.hk/notify.htm\"";
+
+        // 服务接口名称， 固定值
+        orderInfo += "&service=\"mobile.securitypay.pay\"";
+
+        // 支付类型， 固定值
+        orderInfo += "&payment_type=\"1\"";
+
+        // 参数编码， 固定值
+        orderInfo += "&_input_charset=\"utf-8\"";
+
+        // 设置未付款交易的超时时间
+        // 默认30分钟，一旦超时，该笔交易就会自动被关闭。
+        // 取值范围：1m～15d。
+        // m-分钟，h-小时，d-天，1c-当天（无论交易何时创建，都在0点关闭）。
+        // 该参数数值不接受小数点，如1.5h，可转换为90m。
+        orderInfo += "&it_b_pay=\"30m\"";
+
+        // 支付宝处理完请求后，当前页面跳转到商户指定页面的路径，可空
+        orderInfo += "&return_url=\"m.alipay.com\"";
+
+        // 商户私钥，RSA私钥需要使用PKCS8格式
+        // 注意：在实际项目中，这部分应该由服务器生成，不应该在客户端保存私钥
+        orderInfo += "&key_type=\"PKCS8\"";
+
+        // 添加防钓鱼时间戳
+        orderInfo += "&anti_phishing_key=\"\"";
+
+        // 客户端号
+        orderInfo += "&exter_invoke_ip=\"\"";
+
+        // 调用银行卡支付，需配置此参数，参与签名， 固定值
+        // orderInfo += "&paymethod=\"expressGateway\"";
+
+        return orderInfo;
+    }
+
+    /**
+     * 检查是否安装了支付宝客户端（沙箱版）
+     */
+    private boolean checkAliPayInstalled() {
+        try {
+            // 只检查沙箱版支付宝
+            PackageInfo info = getPackageManager().getPackageInfo("com.eg.android.AlipayGphoneRC", 0);
+            return info != null;
+        } catch (NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    // 显示支付对话框（旧方法，保留作为备用）
+    private void showPayDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("充值能量点");
+        builder.setMessage("点击充值按钮可增加能量点，用于获取提示。");
+
+        builder.setPositiveButton("充值", (dialog, which) -> {
+            // 增加5点能量
+            energy += 5;
+            updateEnergyDisplay();
+            Toast.makeText(this, "充值成功，获得5点能量！", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setNegativeButton("取消", null);
+        builder.show();
     }
 
     // 显示难度选择对话框
